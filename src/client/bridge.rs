@@ -8,13 +8,14 @@ use alloy::signers::local::PrivateKeySigner;
 use alloy::sol;
 use anyhow::{Context, Result};
 
-// ERC20 approve + balanceOf + allowance
+// ERC20 approve + balanceOf + allowance + mint (MockUSDC has public mint)
 sol! {
     #[sol(rpc)]
     interface IERC20 {
         function approve(address spender, uint256 amount) external returns (bool);
         function allowance(address owner, address spender) external view returns (uint256);
         function balanceOf(address account) external view returns (uint256);
+        function mint(address to, uint256 amount) external;
     }
 }
 
@@ -60,6 +61,29 @@ impl BridgeClient {
         self.eth_rpc_url
             .parse()
             .context("Invalid ETH RPC URL")
+    }
+
+    /// Mint MockUSDC on Sepolia (test only — MockUSDC has public mint)
+    pub async fn mint_usdc(&self, signer: &PrivateKeySigner, amount: u64) -> Result<String> {
+        let provider = ProviderBuilder::new()
+            .wallet(alloy::network::EthereumWallet::from(signer.clone()))
+            .connect_http(self.rpc_url()?);
+
+        let usdc = IERC20::new(self.usdc_address, &provider);
+        let amount_u256 = U256::from(amount);
+
+        let tx = usdc
+            .mint(signer.address(), amount_u256)
+            .send()
+            .await
+            .context("Failed to send MockUSDC mint transaction")?;
+
+        let receipt = tx
+            .get_receipt()
+            .await
+            .context("Failed to confirm MockUSDC mint transaction")?;
+
+        Ok(format!("0x{}", hex::encode(receipt.transaction_hash.as_slice())))
     }
 
     /// Check USDC balance on EVM chain

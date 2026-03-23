@@ -39,7 +39,7 @@ pub enum AccountCommand {
         #[arg(long)]
         amount: f64,
     },
-    /// Mint test USDC (sender-index mode, devnet only)
+    /// Mint test USDC (Sepolia MockUSDC for private-key, gateway for sender-index)
     MintUsdc {
         #[arg(long)]
         amount: f64,
@@ -170,10 +170,45 @@ pub async fn execute(
             crate::output::print_gateway_result(&resp, output);
         }
         AccountCommand::MintUsdc { amount } => {
-            let mut body = build_identity_fields(identity, subaccount);
-            body["amount"] = serde_json::json!(amount);
-            let resp = gateway.mint_usdc(body).await?;
-            crate::output::print_gateway_result(&resp, output);
+            match identity {
+                Identity::PrivateKey(_) => {
+                    // Mint MockUSDC on Sepolia via EVM contract
+                    let signer = auth::resolve_signer(identity)?;
+                    let cfg = config::load_config()?;
+                    let eth_rpc = cfg.eth_rpc_url.as_deref().unwrap_or(config::DEFAULT_ETH_RPC_URL);
+                    let bridge_addr = cfg.bridge_address.as_deref().unwrap_or(config::DEFAULT_BRIDGE_ADDRESS_DEV);
+                    let usdc_addr = cfg.usdc_address.as_deref().unwrap_or(config::DEFAULT_USDC_ADDRESS);
+
+                    let bridge = crate::client::bridge::BridgeClient::new(eth_rpc, bridge_addr, usdc_addr)?;
+                    let amount_raw = (amount * 1_000_000.0) as u64;
+
+                    eprintln!("Minting {} USDC on Sepolia...", amount);
+                    let tx_hash = bridge.mint_usdc(&signer, amount_raw).await?;
+
+                    match output {
+                        OutputFormat::Json => {
+                            crate::output::print_json(&serde_json::json!({
+                                "success": true,
+                                "tx_hash": tx_hash,
+                                "amount_usdc": amount,
+                                "address": format!("{}", signer.address()),
+                            }));
+                        }
+                        OutputFormat::Table => {
+                            println!("✓ Minted {} USDC on Sepolia", amount);
+                            println!("  tx: {tx_hash}");
+                            println!("  address: {}", signer.address());
+                        }
+                    }
+                }
+                Identity::SenderIndex(_) => {
+                    let mut body = build_identity_fields(identity, subaccount);
+                    body["amount"] = serde_json::json!(amount);
+                    let resp = gateway.mint_usdc(body).await?;
+                    crate::output::print_gateway_result(&resp, output);
+                }
+                Identity::None => unreachable!(),
+            }
         }
         AccountCommand::EvmBalance => {
             let signer = auth::resolve_signer(identity)?;
