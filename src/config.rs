@@ -23,7 +23,7 @@ pub struct DexConfig {
 pub const DEFAULT_ETH_RPC_URL: &str = "https://rpc.sepolia.org";
 pub const DEFAULT_BRIDGE_ADDRESS_DEV: &str = "0x1A741c8Ae351eEf38c2887cE2B64587756D44d1B";
 pub const DEFAULT_BRIDGE_ADDRESS_TEST: &str = "0x02529b8b514D67F10A0B4f3af2d52b239A77fCc5";
-pub const DEFAULT_USDC_ADDRESS: &str = "0x8140EBa492e02Dbf137080E2E4eC0Bd3e10784a0";
+pub const DEFAULT_USDC_ADDRESS: &str = "0x4f1b97893ec3ab8a2aa320927b17e889aa152ff5";
 
 /// 配置文件路径: ~/.config/dex/config.json
 pub fn config_path() -> Result<PathBuf> {
