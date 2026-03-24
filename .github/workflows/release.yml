@@ -25,6 +25,9 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-latest
             cross: true
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+            ext: .exe
 
     steps:
       - uses: actions/checkout@v4
@@ -54,14 +57,22 @@ jobs:
             cargo build --release --target ${{ matrix.target }}
           fi
 
-      - name: Package binary
+      - name: Package binary (unix)
+        if: runner.os != 'Windows'
         run: |
           BIN="target/${{ matrix.target }}/release/dex"
           DEST="dex-${{ matrix.target }}"
           cp "$BIN" "$DEST"
           chmod +x "$DEST"
-          # Also create tar.gz for users who prefer it
           tar czf "${DEST}.tar.gz" -C "target/${{ matrix.target }}/release" dex
+
+      - name: Package binary (windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          BIN="target/${{ matrix.target }}/release/dex.exe"
+          DEST="dex-${{ matrix.target }}.exe"
+          cp "$BIN" "$DEST"
 
       - uses: actions/upload-artifact@v4
         with:
