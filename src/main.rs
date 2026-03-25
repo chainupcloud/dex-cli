@@ -59,6 +59,8 @@ enum Commands {
     Wallet(commands::wallet::WalletArgs),
     /// Watch real-time WebSocket feeds
     Watch(commands::watch::WatchArgs),
+    /// Manage agent/session keys (approve, revoke, list)
+    Agent(commands::agent::AgentArgs),
     /// Admin commands for dev/test (setup markets, oracle, funding)
     Admin(commands::admin::AdminArgs),
     /// Check service connectivity
@@ -150,6 +152,9 @@ pub(crate) async fn run(cli: Cli) -> anyhow::Result<()> {
         }
         Commands::Watch(args) => {
             commands::watch::execute(&api_url, args, output, &identity).await
+        }
+        Commands::Agent(args) => {
+            commands::agent::execute(&exchange, &info, args, output, &identity).await
         }
         Commands::Admin(args) => {
             commands::admin::execute(&gateway, args, output, &identity).await

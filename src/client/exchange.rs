@@ -221,6 +221,60 @@ impl ExchangeClient {
         self.post_exchange(action, nonce, deadline, sig).await
     }
 
+    /// 授权 agent 密钥（主钱包签名）
+    pub async fn approve_agent(
+        &self,
+        master_signer: &PrivateKeySigner,
+        agent_address: [u8; 20],
+        subaccount_number: u32,
+        valid_until_ms: u64,
+    ) -> Result<ExchangeResponse> {
+        let nonce = current_nonce_ms();
+        let deadline = nonce + 3_600_000;
+
+        let struct_hash = hash_approve_agent(
+            subaccount_number,
+            agent_address,
+            valid_until_ms,
+            nonce,
+            deadline,
+        );
+
+        let signing_hash = eip712_signing_hash(struct_hash);
+        let sig = sign_hash(master_signer, signing_hash)?;
+
+        let action = serde_json::json!({
+            "type": "approveAgent",
+            "agentAddress": format!("0x{}", hex::encode(agent_address)),
+            "subaccountNumber": subaccount_number,
+            "validUntilMs": valid_until_ms,
+        });
+
+        self.post_exchange(action, nonce, deadline, sig).await
+    }
+
+    /// 撤销 agent 授权（主钱包签名）
+    pub async fn revoke_agent(
+        &self,
+        master_signer: &PrivateKeySigner,
+        agent_address: [u8; 20],
+    ) -> Result<ExchangeResponse> {
+        let nonce = current_nonce_ms();
+        let deadline = nonce + 300_000;
+
+        let struct_hash = hash_revoke_agent(agent_address, nonce, deadline);
+
+        let signing_hash = eip712_signing_hash(struct_hash);
+        let sig = sign_hash(master_signer, signing_hash)?;
+
+        let action = serde_json::json!({
+            "type": "revokeAgent",
+            "agentAddress": format!("0x{}", hex::encode(agent_address)),
+        });
+
+        self.post_exchange(action, nonce, deadline, sig).await
+    }
+
     /// 发送签名请求到 POST /exchange
     async fn post_exchange(
         &self,
@@ -371,6 +425,46 @@ fn hash_update_leverage(
     buf.extend_from_slice(&abi_encode_u32(perpetual_id));
     buf.extend_from_slice(&abi_encode_bool(is_cross));
     buf.extend_from_slice(&abi_encode_u32(leverage));
+    buf.extend_from_slice(&abi_encode_u64(nonce));
+    buf.extend_from_slice(&abi_encode_u64(deadline));
+
+    keccak256(&buf)
+}
+
+fn hash_approve_agent(
+    subaccount_number: u32,
+    agent_address: [u8; 20],
+    valid_until_ms: u64,
+    nonce: u64,
+    deadline: u64,
+) -> B256 {
+    let type_hash = keccak256(
+        b"ApproveAgent(uint32 subaccountNumber,address agentAddress,uint64 validUntilMs,uint64 nonce,uint64 deadline)",
+    );
+
+    let mut buf = Vec::with_capacity(6 * 32);
+    buf.extend_from_slice(type_hash.as_slice());
+    buf.extend_from_slice(&abi_encode_u32(subaccount_number));
+    buf.extend_from_slice(&abi_encode_address(&agent_address));
+    buf.extend_from_slice(&abi_encode_u64(valid_until_ms));
+    buf.extend_from_slice(&abi_encode_u64(nonce));
+    buf.extend_from_slice(&abi_encode_u64(deadline));
+
+    keccak256(&buf)
+}
+
+fn hash_revoke_agent(
+    agent_address: [u8; 20],
+    nonce: u64,
+    deadline: u64,
+) -> B256 {
+    let type_hash = keccak256(
+        b"RevokeAgent(address agentAddress,uint64 nonce,uint64 deadline)",
+    );
+
+    let mut buf = Vec::with_capacity(4 * 32);
+    buf.extend_from_slice(type_hash.as_slice());
+    buf.extend_from_slice(&abi_encode_address(&agent_address));
     buf.extend_from_slice(&abi_encode_u64(nonce));
     buf.extend_from_slice(&abi_encode_u64(deadline));
 

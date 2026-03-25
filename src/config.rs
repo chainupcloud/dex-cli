@@ -11,6 +11,10 @@ pub struct DexConfig {
     pub environment: Option<String>,
     pub default_subaccount: Option<u32>,
     pub sender_index: Option<u32>,
+    /// Agent private key (secp256k1 hex, for session key trading)
+    pub agent_key: Option<String>,
+    /// Agent expiry timestamp (ms), 0 = permanent
+    pub agent_valid_until: Option<u64>,
     /// EVM RPC URL for bridge deposits (e.g. Sepolia)
     pub eth_rpc_url: Option<String>,
     /// Bridge contract address on EVM chain

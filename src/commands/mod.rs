@@ -1,5 +1,6 @@
 pub mod account;
 pub mod admin;
+pub mod agent;
 pub mod market;
 pub mod order;
 pub mod position;
