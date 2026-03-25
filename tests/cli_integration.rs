@@ -121,3 +121,37 @@ fn test_account_requires_identity() {
         .failure()
         .stderr(predicate::str::contains("No wallet configured"));
 }
+
+#[test]
+fn test_agent_help() {
+    dex()
+        .args(["agent", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("approve"))
+        .stdout(predicate::str::contains("revoke"))
+        .stdout(predicate::str::contains("list"))
+        .stdout(predicate::str::contains("show"));
+}
+
+#[test]
+fn test_agent_approve_help() {
+    dex()
+        .args(["agent", "approve", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("agent-address"))
+        .stdout(predicate::str::contains("valid-until"));
+}
+
+#[test]
+fn test_agent_show_no_key() {
+    dex()
+        .env("HOME", "/tmp/dex-cli-test-nonexistent")
+        .env_remove("DEX_PRIVATE_KEY")
+        .env_remove("DEX_SENDER_INDEX")
+        .args(["agent", "show"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No agent key configured"));
+}
