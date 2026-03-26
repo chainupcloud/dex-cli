@@ -145,7 +145,7 @@ pub(crate) async fn run(cli: Cli) -> anyhow::Result<()> {
             commands::position::execute(&info, &gateway, args, output, &identity, subaccount, &exchange).await
         }
         Commands::Account(args) => {
-            commands::account::execute(&info, &gateway, args, output, &identity, subaccount).await
+            commands::account::execute(&info, &gateway, args, output, &identity, subaccount, cli.env.as_deref()).await
         }
         Commands::Wallet(args) => {
             commands::wallet::execute(&gateway, args, output, &identity).await

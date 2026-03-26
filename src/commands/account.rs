@@ -65,6 +65,14 @@ fn build_identity_fields(identity: &Identity, subaccount: u32) -> serde_json::Va
     }
 }
 
+/// 根据环境选择桥合约地址
+fn default_bridge_address(env: Option<&str>) -> &'static str {
+    match env {
+        Some("testnet") => config::DEFAULT_BRIDGE_ADDRESS_TEST,
+        _ => config::DEFAULT_BRIDGE_ADDRESS_DEV,
+    }
+}
+
 pub async fn execute(
     info: &InfoClient,
     gateway: &GatewayClient,
@@ -72,6 +80,7 @@ pub async fn execute(
     output: OutputFormat,
     identity: &Identity,
     subaccount: u32,
+    env: Option<&str>,
 ) -> Result<()> {
     auth::require_identity(identity)?;
 
@@ -115,7 +124,7 @@ pub async fn execute(
                     let bridge_addr = cfg
                         .bridge_address
                         .as_deref()
-                        .unwrap_or(config::DEFAULT_BRIDGE_ADDRESS_DEV);
+                        .unwrap_or_else(|| default_bridge_address(env));
                     let usdc_addr = cfg
                         .usdc_address
                         .as_deref()
@@ -176,7 +185,7 @@ pub async fn execute(
                     let signer = auth::resolve_signer(identity)?;
                     let cfg = config::load_config()?;
                     let eth_rpc = cfg.eth_rpc_url.as_deref().unwrap_or(config::DEFAULT_ETH_RPC_URL);
-                    let bridge_addr = cfg.bridge_address.as_deref().unwrap_or(config::DEFAULT_BRIDGE_ADDRESS_DEV);
+                    let bridge_addr = cfg.bridge_address.as_deref().unwrap_or_else(|| default_bridge_address(env));
                     let usdc_addr = cfg.usdc_address.as_deref().unwrap_or(config::DEFAULT_USDC_ADDRESS);
 
                     let bridge = crate::client::bridge::BridgeClient::new(eth_rpc, bridge_addr, usdc_addr)?;
@@ -220,7 +229,7 @@ pub async fn execute(
             let bridge_addr = cfg
                 .bridge_address
                 .as_deref()
-                .unwrap_or(config::DEFAULT_BRIDGE_ADDRESS_DEV);
+                .unwrap_or_else(|| default_bridge_address(env));
             let usdc_addr = cfg
                 .usdc_address
                 .as_deref()
