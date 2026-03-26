@@ -113,8 +113,9 @@ pub async fn resolve_address(
                 .ok_or_else(|| anyhow::anyhow!("No address returned for sender_index {idx}"))
         }
         Identity::PrivateKey(key) => {
+            // API 需要 Sui 地址（Blake2b256 派生），不是 ETH 地址
             let signer = create_signer(key)?;
-            Ok(format!("{}", signer_address(&signer)))
+            Ok(derive_sui_address_hex(&signer))
         }
         Identity::None => {
             anyhow::bail!(
