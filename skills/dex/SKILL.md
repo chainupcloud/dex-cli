@@ -27,6 +27,18 @@ Backend services:
 - **MockUSDC** (Sepolia `0x4f1b97893ec3ab8a2aa320927b17e889aa152ff5`) — test USDC, public mint
 - **Bridge** (Sepolia `0x1A741c8Ae351eEf38c2887cE2B64587756D44d1B`) — cross-chain deposit
 
+## Agent / Session Key
+
+Agent key enables **sign-once, trade-forever**: the master wallet signs one `ApproveAgent` EIP-712 message, then an auto-generated agent key handles all subsequent trade signatures locally — no wallet popups.
+
+**How it works:**
+1. `dex agent approve` generates an agent keypair + master signs ApproveAgent → chain records `agents[agentAddr] = masterPubkey`
+2. Agent private key saved to `~/.config/dex/config.json`
+3. Subsequent `order place` / `order cancel` / `position leverage` use agent key to sign locally
+4. Chain verifies: recover signer → lookup agents map → find master → execute on master's subaccount
+
+**Security boundary:** Agent can trade (place/cancel orders, set leverage) but **cannot withdraw funds, approve/revoke agents, or bridge deposit**. If agent key leaks, funds are safe.
+
 ## Rules
 
 1. **Always use `-o json`** for data retrieval, then present results in natural language
@@ -35,6 +47,7 @@ Backend services:
 4. **Check connectivity first** — run `dex -o json status api` on first interaction if unsure
 5. **Never call `wallet faucet`** — gas is managed automatically in sender-index mode, not needed for EIP-712 mode
 6. **Sepolia ETH required** for private-key mode EVM operations (mint-usdc, deposit) — guide user to a faucet if needed
+7. **Recommend `dex agent approve`** after wallet creation in private-key mode — enables frictionless trading without repeated wallet confirmations
 
 ## Complete User Journeys
 
@@ -72,7 +85,12 @@ dex -o json account deposit --amount 100000
 # Step 6: Verify DEX balance
 dex -o json account info
 
-# Step 7: Trade (EIP-712 signed → POST /exchange)
+# Step 7: Enable agent key (one-time, enables frictionless trading)
+dex agent approve
+# → Generates agent keypair, master signs ApproveAgent
+# → Agent key saved to config — all future trades use it automatically
+
+# Step 8: Trade (agent key signs locally, instant, no wallet popup)
 dex -o json order place --perpetual-id 0 --side buy --quantity 1 --price 66000
 dex -o json order list
 dex -o json position list
@@ -117,6 +135,35 @@ dex -o json --sender-index 2 order place \
 # Verify both sides
 dex -o json --sender-index 1 account fills --limit 1
 dex -o json --sender-index 2 position list
+```
+
+### Journey D: Agent Key Lifecycle
+
+```bash
+# Authorize agent (auto-generates keypair, permanent by default)
+dex agent approve
+# → ✓ Agent approved
+#     Master:  0x185b1c48...
+#     Agent:   0xa3f7e9d2...
+#     Expires: permanent
+#     Agent key saved to config.
+
+# With expiry
+dex agent approve --valid-until 24h     # Expires in 24 hours
+dex agent approve --valid-until 7d      # Expires in 7 days
+
+# Authorize a specific external agent address (no key saved locally)
+dex agent approve --agent-address 0xa3f7e9d2...
+
+# View current agent
+dex -o json agent show
+
+# List all agents
+dex -o json agent list
+
+# Revoke agent
+dex agent revoke --agent-address 0xa3f7e9d2...
+# → Removes from chain + clears from local config if matching
 ```
 
 ## Command Reference
@@ -188,6 +235,18 @@ dex -o json wallet show                         # Full info (address, mode, conf
 dex wallet reset --force                        # Delete config
 ```
 
+### Agent / Session Key
+
+```bash
+dex agent approve                                       # Generate + authorize agent (permanent)
+dex agent approve --valid-until 24h                     # Agent valid for 24 hours
+dex agent approve --valid-until 7d                      # Agent valid for 7 days
+dex agent approve --agent-address <0x-addr>             # Authorize an existing address
+dex agent revoke --agent-address <0x-addr>              # Revoke agent authorization
+dex -o json agent list                                  # List authorized agents
+dex -o json agent show                                  # Show current agent key info
+```
+
 ### Admin (dev/test, requires --sender-index)
 
 ```bash
@@ -242,6 +301,8 @@ dex shell                                       # REPL mode
 | "Failed to send" (EVM tx) | No Sepolia ETH for gas | Visit https://sepoliafaucet.com |
 | "HTTP 502 Bad Gateway" | Gateway service down | Check `dex status gateway` |
 | "Bridge deposit submitted" but funds not arrived | Bridge node processing | Wait 2-10 minutes, check `dex account info` |
+| "No agent key configured" | Agent not set up | `dex agent approve` to create one |
+| "Agent expired" | Agent validity period ended | `dex agent approve` to create a new one |
 
 ## Response Guidelines
 
@@ -252,3 +313,4 @@ dex shell                                       # REPL mode
 - **Deposit timing**: Always remind user that bridge deposits take 2-10 minutes
 - **Identity guidance**: If user hasn't set up, recommend `dex wallet create` for production or `--sender-index 0` for quick dev testing
 - **Sepolia gas**: If any EVM operation fails, check if user has Sepolia ETH first
+- **Agent setup**: After `wallet create`, proactively suggest `dex agent approve` so trading is frictionless
