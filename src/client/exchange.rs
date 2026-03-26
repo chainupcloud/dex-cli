@@ -228,6 +228,7 @@ impl ExchangeClient {
         agent_address: [u8; 20],
         subaccount_number: u32,
         valid_until_ms: u64,
+        agent_name: &str,
     ) -> Result<ExchangeResponse> {
         let nonce = current_nonce_ms();
         let deadline = nonce + 3_600_000;
@@ -246,6 +247,7 @@ impl ExchangeClient {
         let action = serde_json::json!({
             "type": "approveAgent",
             "agentAddress": format!("0x{}", hex::encode(agent_address)),
+            "agentName": agent_name,
             "subaccountNumber": subaccount_number,
             "validUntilMs": valid_until_ms,
         });

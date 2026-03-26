@@ -24,6 +24,9 @@ pub enum AgentCommand {
         /// Validity duration: "24h", "7d", "permanent" (default: permanent)
         #[arg(long, default_value = "permanent")]
         valid_until: String,
+        /// Agent name (for identification)
+        #[arg(long, default_value = "dex-cli")]
+        agent_name: String,
     },
     /// Revoke an agent key (signs with master wallet)
     Revoke {
@@ -76,6 +79,7 @@ pub async fn execute(
         AgentCommand::Approve {
             agent_address,
             valid_until,
+            agent_name,
         } => {
             let master_signer = auth::resolve_signer(identity)?;
             let valid_until_ms = parse_valid_until(&valid_until)?;
@@ -94,7 +98,7 @@ pub async fn execute(
             };
 
             let resp = exchange
-                .approve_agent(&master_signer, agent_addr_bytes, 0, valid_until_ms)
+                .approve_agent(&master_signer, agent_addr_bytes, 0, valid_until_ms, &agent_name)
                 .await?;
 
             // Save agent key to config if we generated it
