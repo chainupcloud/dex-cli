@@ -113,10 +113,22 @@ pub async fn execute(
             match identity {
                 Identity::PrivateKey(_) => {
                     let signer = auth::resolve_signer(identity)?;
-                    // TODO: 实际应根据 atomic_resolution 和 QCE 将 human-readable 转为 quantums/subticks
-                    // 目前直接传原始值，适配开发环境
-                    let quantums = quantity as u64;
-                    let subticks = price.unwrap_or(0.0) as u64;
+
+                    // 查询市场参数，转换 human-readable → quantums/subticks
+                    let meta = info.meta().await?;
+                    let market = meta.universe.iter()
+                        .find(|m| m.perpetual_id == perpetual_id as i32)
+                        .ok_or_else(|| anyhow::anyhow!("Market perpetual_id={perpetual_id} not found"))?;
+
+                    let ar = market.atomic_resolution;
+                    let qce = market.quantum_conversion_exponent;
+                    const QUOTE_DECIMALS: i32 = 6;
+
+                    // quantums = human_quantity × 10^(-AR)
+                    let quantums = (quantity * 10f64.powi(-ar)) as u64;
+                    // subticks = human_price × 10^(QUOTE_DECIMALS + AR - QCE)
+                    let price_f = price.unwrap_or(0.0);
+                    let subticks = (price_f * 10f64.powi(QUOTE_DECIMALS + ar - qce)) as u64;
                     let cid = client_id.unwrap_or(0) as u32;
                     let worst_price = if matches!(order_type, OrderType::Market) {
                         if is_buy { u64::MAX / 2 } else { 1 }
